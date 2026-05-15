@@ -1,0 +1,52 @@
+{
+  "name": "repuestos-pro",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Plataforma de gestión inteligente de pedidos y repuestos para talleres técnicos",
+  "type": "module",
+  "scripts": {
+    "dev":     "vite",
+    "build":   "vite build",
+    "preview": "vite preview",
+    "lint":    "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0"
+  },
+  "dependencies": {
+    "react":     "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react":              "^18.3.3",
+    "@types/react-dom":          "^18.3.0",
+    "@vitejs/plugin-react":      "^4.3.1",
+    "eslint":                    "^8.57.0",
+    "eslint-plugin-react":       "^7.34.2",
+    "eslint-plugin-react-hooks": "^4.6.2",
+    "eslint-plugin-react-refresh":"^0.4.7",
+    "vite":                      "^5.4.0"
+  },
+  "_installNotes": {
+    "pasos": [
+      "1. Crea el proyecto: npx create-vite@latest repuestos-pro --template react",
+      "2. cd repuestos-pro",
+      "3. Reemplaza package.json con este archivo",
+      "4. npm install",
+      "5. Copia los .jsx entregados a src/ y src/modules/",
+      "6. Renombra App_Final.jsx → App.jsx",
+      "7. npm run dev → abre http://localhost:5173"
+    ],
+    "estructuraFinal": {
+      "src/": {
+        "App.jsx":                  "App_Final.jsx (renombrar)",
+        "main.jsx":                 "main.jsx (sin cambios)",
+        "modules/": {
+          "AuthSystem.jsx":         "Sistema login + recuperar contraseña",
+          "RepuestosPRO.jsx":       "Dashboard + Cotizaciones + Crear Pedido",
+          "ModuloPedidos.jsx":      "Tabla avanzada de pedidos",
+          "ModuloRepuestos.jsx":    "Catálogo con historial de precios",
+          "ModuloProveedores.jsx":  "Gestión y comparador de proveedores",
+          "PanelAdmin.jsx":         "Usuarios, auditoría, reportes y config"
+        }
+      }
+    }
+  }
+}
