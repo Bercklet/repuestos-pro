@@ -155,6 +155,143 @@ function SeccionUsuarios() {
 
   const handleCambiarRol = async (id, nuevoRol) => {
     setGuardando(id); setError('');
+    try { await actualizarUsuario(id, { rol: nuevoRol }); }
+    catch (e) { setError(e.message); }
+    finally { setGuardando(null); }
+  };
+
+  const handleToggleActivo = async (id, activo) => {
+    setGuardando(id);
+    try { await actualizarUsuario(id, { activo: !activo }); }
+    catch (e) { setError(e.message); }
+    finally { setGuardando(null); }
+  };
+
+  const handleEditarNombre = async (id, nombre) => {
+    if (!nombre.trim()) return;
+    try { await actualizarUsuario(id, { nombre: nombre.trim() }); }
+    catch (e) { setError(e.message); }
+  };
+
+  const handleEliminar = async (u) => {
+    if (!window.confirm('Desactivar a ' + u.nombre + '?')) return;
+    try {
+      await actualizarUsuario(u.id, { activo: false });
+      cargar();
+    } catch (e) { setError(e.message); }
+  };
+
+  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: '#9c9a92' }}>Cargando usuarios...</div>;
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <div style={{ fontSize: 15, fontWeight: 600 }}>Usuarios del sistema ({usuarios.length})</div>
+        {esAdmin && (
+          <button onClick={() => setModalNuevo(true)}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, fontSize: 13, fontWeight: 600, fontFamily: 'inherit', background: '#1a1916', color: '#fff', border: 'none', cursor: 'pointer' }}>
+            + Nuevo usuario
+          </button>
+        )}
+      </div>
+
+      {error && <div style={{ padding: '10px 14px', background: '#fff1f1', border: '1px solid #fecaca', borderRadius: 8, fontSize: 13, color: '#dc2626', marginBottom: 12 }}>error</div>}
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {usuarios.map(u => {
+          const rolCfg = ROLES_CFG[u.rol] || ROLES_CFG.tecnico;
+          const esMi   = u.id === miPerfil?.id;
+          const permisos = PERMISOS[u.rol] || PERMISOS.tecnico;
+          const isOpen = selected?.id === u.id;
+          return (
+            <div key={u.id} style={{ background: '#fff', border: '1px solid #e2dfd8', borderRadius: 12, overflow: 'hidden' }}>
+              <div style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}
+                onClick={() => setSelected(isOpen ? null : u)}>
+                <div style={{ width: 38, height: 38, borderRadius: '50%', background: u.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: '#fff', flexShrink: 0 }}>
+                  {u.avatar}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ fontSize: 14, fontWeight: 600 }}>{u.nombre}</div>
+                    {esMi && <span style={{ fontSize: 11, background: '#f0eee9', color: '#6b6860', padding: '1px 6px', borderRadius: 99 }}>Tu</span>}
+                    {!u.activo && <span style={{ fontSize: 11, background: '#fee2e2', color: '#dc2626', padding: '1px 6px', borderRadius: 99 }}>Desactivado</span>}
+                  </div>
+                  <div style={{ fontSize: 12, color: '#9c9a92' }}>{u.email} - {u.pedidos_count} pedidos</div>
+                </div>
+                <Badge cfg={rolCfg} />
+                <div style={{ fontSize: 12, color: '#9c9a92', whiteSpace: 'nowrap' }}>
+                  {u.ultimo_acceso ? tiempoRelativo(u.ultimo_acceso) : 'Sin acceso'}
+                </div>
+                <span style={{ fontSize: 12, color: '#9c9a92' }}>{isOpen ? '▴' : '▾'}</span>
+              </div>
+
+              {isOpen && esAdmin && !esMi && (
+                <div style={{ padding: '14px 18px', background: '#fafaf9', borderTop: '1px solid #f0eee9' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: '#9c9a92', marginBottom: 8 }}>CAMBIAR ROL</div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        {Object.entries(ROLES_CFG).map(([k, v]) => (
+                          <button key={k} onClick={() => handleCambiarRol(u.id, k)} disabled={guardando === u.id}
+                            style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 8, border: '1.5px solid ' + (u.rol === k ? v.color : '#e2dfd8'), background: u.rol === k ? v.bg : '#fff', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12.5, fontWeight: u.rol === k ? 700 : 400, color: v.color }}>
+                            {v.label}
+                            {u.rol === k && <span style={{ marginLeft: 'auto' }}>✓</span>}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: '#9c9a92', marginBottom: 8 }}>ACCIONES</div>
+                      <div style={{ marginBottom: 10 }}>
+                        <label style={{ fontSize: 11, fontWeight: 600, color: '#6b6860', display: 'block', marginBottom: 4 }}>EDITAR NOMBRE</label>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <input
+                            defaultValue={u.nombre}
+                            id={'nombre-' + u.id}
+                            style={{ flex: 1, border: '1.5px solid #e2dfd8', borderRadius: 7, padding: '6px 8px', fontSize: 12, fontFamily: 'inherit', outline: 'none' }}
+                          />
+                          <button
+                            onClick={() => handleEditarNombre(u.id, document.getElementById('nombre-' + u.id).value)}
+                            style={{ padding: '6px 10px', background: '#1a1916', color: '#fff', border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                            ✓
+                          </button>
+                        </div>
+                      </div>
+                      <button onClick={() => handleToggleActivo(u.id, u.activo)} disabled={guardando === u.id}
+                        style={{ width: '100%', padding: '7px', borderRadius: 8, border: '1px solid ' + (u.activo ? '#fecaca' : '#bbf7d0'), background: u.activo ? '#fff1f1' : '#f0fdf4', color: u.activo ? '#dc2626' : '#15803d', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', marginBottom: 6 }}>
+                        {u.activo ? 'Desactivar cuenta' : 'Activar cuenta'}
+                      </button>
+                      <button onClick={() => handleEliminar(u)}
+                        style={{ width: '100%', padding: '7px', borderRadius: 8, border: '1px solid #fecaca', background: '#fff1f1', color: '#dc2626', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                        Eliminar usuario
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {modalNuevo && (
+        <ModalNuevoUsuario
+          onClose={() => setModalNuevo(false)}
+          onCreado={cargar}
+        />
+      )}
+    </div>
+  );
+}
+  const { perfil: miPerfil, esAdmin } = useAuth();
+  const { usuarios, loading, actualizarUsuario, cargar } = useUsuarios();
+  const [selected, setSelected]   = useState(null);
+  const [modalNuevo, setModalNuevo] = useState(false);
+  const [guardando, setGuardando] = useState(null);
+  const [error, setError]         = useState('');
+
+  const handleCambiarRol = async (id, nuevoRol) => {
+    setGuardando(id); setError('');
     try {
       await actualizarUsuario(id, { rol: nuevoRol });
     } catch (e) {
