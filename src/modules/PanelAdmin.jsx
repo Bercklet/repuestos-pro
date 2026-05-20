@@ -243,10 +243,52 @@ function SeccionUsuarios() {
                           </div>
                         ))}
                       </div>
-                      <button onClick={() => handleToggleActivo(u.id, u.activo)} disabled={guardando === u.id}
-                        style={{ marginTop: 12, width: '100%', padding: '7px', borderRadius: 8, border: `1px solid ${u.activo ? '#fecaca' : '#bbf7d0'}`, background: u.activo ? '#fff1f1' : '#f0fdf4', color: u.activo ? '#dc2626' : '#15803d', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
-                        {u.activo ? '⛔ Desactivar cuenta' : '✅ Activar cuenta'}
-                      </button>
+                      {puedeEditar && (
+  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 12 }}>
+    {/* Editar nombre */}
+    <div>
+      <label style={{ fontSize: 11, fontWeight: 600, color: '#6b6860', display: 'block', marginBottom: 3 }}>NOMBRE</label>
+      <div style={{ display: 'flex', gap: 6 }}>
+        <input
+          defaultValue={u.nombre}
+          id={`nombre-${u.id}`}
+          style={{ flex: 1, border: '1.5px solid #e2dfd8', borderRadius: 7, padding: '6px 8px', fontSize: 12, fontFamily: 'inherit', outline: 'none' }}
+        />
+        <button
+          onClick={async () => {
+            const nombre = document.getElementById(`nombre-${u.id}`).value.trim();
+            if (!nombre) return;
+            await actualizarUsuario(u.id, { nombre });
+          }}
+          style={{ padding: '6px 10px', background: '#1a1916', color: '#fff', border: 'none', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+          ✓
+        </button>
+      </div>
+    </div>
+
+    {/* Activar/Desactivar */}
+    <button onClick={() => handleToggleActivo(u.id, u.activo)} disabled={guardando === u.id}
+      style={{ width: '100%', padding: '7px', borderRadius: 8, border: `1px solid ${u.activo ? '#fecaca' : '#bbf7d0'}`, background: u.activo ? '#fff1f1' : '#f0fdf4', color: u.activo ? '#dc2626' : '#15803d', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+      {u.activo ? '⛔ Desactivar cuenta' : '✅ Activar cuenta'}
+    </button>
+
+    {/* Eliminar usuario */}
+    <button
+      onClick={async () => {
+        if (!window.confirm(`¿Eliminar a ${u.nombre}? Esta acción no se puede deshacer.`)) return;
+        try {
+          await actualizarUsuario(u.id, { activo: false });
+          // Marcar como inactivo (eliminación real requiere service role)
+          alert('Usuario desactivado. Para eliminarlo completamente ve a Supabase → Authentication → Users.');
+          cargar();
+        } catch (e) {
+          alert('Error: ' + e.message);
+        }
+      }}
+      style={{ width: '100%', padding: '7px', borderRadius: 8, border: '1px solid #fecaca', background: '#fff1f1', color: '#dc2626', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+      🗑️ Eliminar usuario
+    </button>
+  </div>
                     </div>
                   </div>
                 </div>
