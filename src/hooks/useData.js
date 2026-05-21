@@ -322,7 +322,11 @@ export function useAuditoria({ limite = 50 } = {}) {
       .select('*, usuario:perfiles(nombre, rol, avatar, color)')
       .order('created_at', { ascending: false })
       .limit(limite)
-      .then(({ data }) => { setRegistros(data || []); setLoading(false); });
+      .then(({ data, error }) => {
+        if (!error) setRegistros(data || []);
+        setLoading(false);  // ← esto es clave, siempre ejecutar
+      })
+      .catch(() => setLoading(false));  // ← por si falla
   }, [limite]);
 
   useRealtimeList({ table: 'auditoria', items: registros, setItems: setRegistros });

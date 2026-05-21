@@ -356,7 +356,7 @@ function SeccionReportes() {
   const [reporteData, setReporteData] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  useState(() => {
+  useEffect(() => {
     const cargar = async () => {
       const [
         { data: pedidos },
