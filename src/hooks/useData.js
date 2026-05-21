@@ -334,13 +334,12 @@ export function useAuditoria({ limite = 50 } = {}) {
 // useDashboardStats — estadísticas en tiempo real calculadas en DB
 // ─────────────────────────────────────────────────────────────
 export function useDashboardStats() {
-  const [stats, setStats]       = useState(null);
+  const [stats, setStats]         = useState(null);
   const [actividad, setActividad] = useState([]);
-  const [loading, setLoading]   = useState(true);
+  const [loading, setLoading]     = useState(true);
 
   const cargar = useCallback(async () => {
     setLoading(true);
-    // Stats de pedidos
     const [
       { count: total },
       { count: pendientes },
@@ -370,7 +369,6 @@ export function useDashboardStats() {
 
   useEffect(() => { cargar(); }, [cargar]);
 
-  // Re-calcular stats cuando cambian pedidos o auditoría
   useRealtimeList({
     table: 'auditoria',
     items: actividad,
