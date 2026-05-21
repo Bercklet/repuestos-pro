@@ -339,42 +339,49 @@ export function useDashboardStats() {
   const [loading, setLoading]     = useState(true);
 
   const cargar = useCallback(async () => {
-    setLoading(true);
-    const [
-      { count: total },
-      { count: pendientes },
-      { count: urgentes },
-      { data: gastoData },
-      { data: actividadData },
-    ] = await Promise.all([
-      supabase.from('pedidos').select('*', { count: 'exact', head: true }),
-      supabase.from('pedidos').select('*', { count: 'exact', head: true }).eq('estado', 'pendiente'),
-      supabase.from('pedidos').select('*', { count: 'exact', head: true }).eq('prioridad', 'urgente'),
-      supabase.from('pedidos').select('unitario, cantidad').not('unitario', 'is', null),
-      supabase
-        .from('auditoria')
-        .select('*, usuario:perfiles(nombre, avatar, color)')
-        .order('created_at', { ascending: false })
-        .limit(8),
-    ]);
+    try {
+      const [
+        { count: total },
+        { count: pendientes },
+        { count: urgentes },
+        { data: gastoData },
+        { data: actividadData },
+      ] = await Promise.all([
+        supabase.from('pedidos').select('*', { count: 'exact', head: true }),
+        supabase.from('pedidos').select('*', { count: 'exact', head: true }).eq('estado', 'pendiente'),
+        supabase.from('pedidos').select('*', { count: 'exact', head: true }).eq('prioridad', 'urgente'),
+        supabase.from('pedidos').select('unitario, cantidad').not('unitario', 'is', null),
+        supabase
+          .from('auditoria')
+          .select('*, usuario:perfiles(nombre, avatar, color)')
+          .order('created_at', { ascending: false })
+          .limit(8),
+      ]);
 
-    const gastoTotal = (gastoData || []).reduce(
-      (acc, p) => acc + (p.unitario * (p.cantidad || 1)), 0
-    );
+      const gastoTotal = (gastoData || []).reduce(
+        (acc, p) => acc + ((p.unitario || 0) * (p.cantidad || 1)), 0
+      );
 
-    setStats({ total, pendientes, urgentes, gastoTotal });
-    setActividad(actividadData || []);
-    setLoading(false);
+      setStats({ total: total || 0, pendientes: pendientes || 0, urgentes: urgentes || 0, gastoTotal });
+      setActividad(actividadData || []);
+    } catch (e) {
+      console.error('Dashboard error:', e);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { cargar(); }, [cargar]);
 
-  useRealtimeList({
-    table: 'auditoria',
-    items: actividad,
-    setItems: setActividad,
-    channelId: 'dashboard_auditoria',
-  });
+  useEffect(() => {
+    const canal = supabase
+      .channel('dashboard_live')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'auditoria' },
+        () => { cargar(); }
+      )
+      .subscribe();
+    return () => supabase.removeChannel(canal);
+  }, [cargar]);
 
   return { stats, actividad, loading, cargar };
 }
