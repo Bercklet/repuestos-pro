@@ -354,7 +354,7 @@ export function useDashboardStats() {
         supabase.from('pedidos').select('*', { count: 'exact', head: true }),
         supabase.from('pedidos').select('*', { count: 'exact', head: true }).eq('estado', 'pendiente'),
         supabase.from('pedidos').select('*', { count: 'exact', head: true }).eq('prioridad', 'urgente'),
-        supabase.from('pedidos').select('unitario, cantidad').not('unitario', 'is', null),
+        supabase.from('pedidos').select('unitario, cantidad').eq('estado', 'entregado'),
         supabase
           .from('auditoria')
           .select('*, usuario:perfiles(nombre, avatar, color)')
