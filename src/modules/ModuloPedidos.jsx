@@ -1,6 +1,6 @@
 // src/modules/ModuloPedidos.jsx
 // Pedidos en tiempo real — sin datos mock, sin localStorage
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { usePedidos }  from '../hooks/useData';
 import { useComentariosPedido } from '../hooks/useData';
@@ -27,6 +27,22 @@ function Badge({ cfg }) {
       {cfg.dot && <span style={{ width: 5, height: 5, borderRadius: '50%', background: cfg.dot, flexShrink: 0 }} />}
       {cfg.label}
     </span>
+  );
+}
+
+// ─── INPUT FIELD — definido FUERA del componente para no recrearse ─
+function InputField({ label, value, onChange, type = 'text', placeholder }) {
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <label style={{ fontSize: 12, fontWeight: 600, color: '#6b6860', display: 'block', marginBottom: 4 }}>{label}</label>
+      <input
+        type={type}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder}
+        style={{ width: '100%', border: '1.5px solid #e2dfd8', borderRadius: 8, padding: '8px 10px', fontSize: 13, fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }}
+      />
+    </div>
   );
 }
 
@@ -65,7 +81,6 @@ function DetallePedido({ pedido, onClose, onUpdate, onCambiarEstado, puedeEditar
   const { perfil } = useAuth();
   const { comentarios, agregarComentario } = useComentariosPedido(pedido.id);
   const [precio, setPrecio]     = useState(pedido.unitario || 0);
-  const [proveedor, setProveedor] = useState(pedido.proveedor?.nombre || '');
   const [estado, setEstado]     = useState(pedido.estado);
   const [nuevoComent, setNuevo] = useState('');
   const [guardando, setGuardando] = useState(false);
@@ -116,7 +131,7 @@ function DetallePedido({ pedido, onClose, onUpdate, onCambiarEstado, puedeEditar
               { label: 'Marca/Modelo', val: `${pedido.marca || ''} ${pedido.modelo || ''}`.trim() || '—' },
               { label: 'Tipo', val: pedido.tipo || '—' },
               { label: 'Cantidad', val: pedido.cantidad },
-              { label: 'Fecha', val: new Date(pedido.created_at).toLocaleDateString('es-CO') },
+              { label: 'Fecha', val: new Date(pedido.created_at).toLocaleString('es-CO', { dateStyle: 'medium', timeStyle: 'short' }) },
             ].map(({ label, val }) => (
               <div key={label} style={{ background: '#f7f6f3', borderRadius: 9, padding: '10px 12px' }}>
                 <div style={{ fontSize: 11, color: '#9c9a92', fontWeight: 600, marginBottom: 3 }}>{label}</div>
@@ -145,7 +160,7 @@ function DetallePedido({ pedido, onClose, onUpdate, onCambiarEstado, puedeEditar
               <div style={{ marginBottom: 10 }}>
                 <label style={{ fontSize: 12, color: '#6b6860', fontWeight: 600 }}>VALOR UNITARIO</label>
                 <input type="number" value={precio} onChange={e => setPrecio(e.target.value)}
-                  style={{ width: '100%', border: '1.5px solid #e2dfd8', borderRadius: 8, padding: '7px 10px', fontSize: 13, fontFamily: 'inherit', outline: 'none', marginTop: 4 }} />
+                  style={{ width: '100%', border: '1.5px solid #e2dfd8', borderRadius: 8, padding: '7px 10px', fontSize: 13, fontFamily: 'inherit', outline: 'none', marginTop: 4, boxSizing: 'border-box' }} />
               </div>
               {error && <div style={{ fontSize: 12, color: '#dc2626', marginBottom: 8 }}>⚠ {error}</div>}
               <button onClick={guardar} disabled={guardando}
@@ -190,6 +205,8 @@ function DetallePedido({ pedido, onClose, onUpdate, onCambiarEstado, puedeEditar
 }
 
 // ─── MODAL NUEVO PEDIDO ───────────────────────────────────────
+// CRÍTICO: Este componente NO debe tener sub-componentes definidos dentro
+// porque React los recrea en cada render y el input pierde el foco.
 function ModalNuevoPedido({ onClose, onCrear }) {
   const { perfil } = useAuth();
   const [form, setForm] = useState({
@@ -199,7 +216,8 @@ function ModalNuevoPedido({ onClose, onCrear }) {
   const [guardando, setGuardando] = useState(false);
   const [error, setError]         = useState('');
 
-  const set = (k, v) => setForm(prev => ({ ...prev, [k]: v }));
+  // Setter estable con useCallback para evitar re-renders innecesarios
+  const set = useCallback((k, v) => setForm(prev => ({ ...prev, [k]: v })), []);
 
   const crear = async () => {
     if (!form.repuesto.trim()) { setError('El nombre del repuesto es obligatorio'); return; }
@@ -214,14 +232,6 @@ function ModalNuevoPedido({ onClose, onCrear }) {
     }
   };
 
-  const InputF = ({ label, value, onChange, type = 'text', placeholder }) => (
-    <div style={{ marginBottom: 12 }}>
-      <label style={{ fontSize: 12, fontWeight: 600, color: '#6b6860', display: 'block', marginBottom: 4 }}>{label}</label>
-      <input type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
-        style={{ width: '100%', border: '1.5px solid #e2dfd8', borderRadius: 8, padding: '8px 10px', fontSize: 13, fontFamily: 'inherit', outline: 'none' }} />
-    </div>
-  );
-
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.4)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
       onClick={onClose}>
@@ -232,10 +242,11 @@ function ModalNuevoPedido({ onClose, onCrear }) {
           <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#9c9a92' }}>×</button>
         </div>
 
-        <InputF label="REPUESTO *" value={form.repuesto} onChange={v => set('repuesto', v)} placeholder="Ej: Pantalla Samsung A54" />
+        {/* Usando InputField definido FUERA del componente */}
+        <InputField label="REPUESTO *" value={form.repuesto} onChange={v => set('repuesto', v)} placeholder="Ej: Pantalla Samsung A54" />
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          <InputF label="MARCA" value={form.marca} onChange={v => set('marca', v)} placeholder="Samsung" />
-          <InputF label="MODELO" value={form.modelo} onChange={v => set('modelo', v)} placeholder="Galaxy A54" />
+          <InputField label="MARCA" value={form.marca} onChange={v => set('marca', v)} placeholder="Samsung" />
+          <InputField label="MODELO" value={form.modelo} onChange={v => set('modelo', v)} placeholder="Galaxy A54" />
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
           <div>
@@ -245,7 +256,7 @@ function ModalNuevoPedido({ onClose, onCrear }) {
               {['Original', 'OEM', 'Genérico', 'Recuperado'].map(t => <option key={t}>{t}</option>)}
             </select>
           </div>
-          <InputF label="CANTIDAD" value={form.cantidad} onChange={v => set('cantidad', v)} type="number" />
+          <InputField label="CANTIDAD" value={form.cantidad} onChange={v => set('cantidad', v)} type="number" />
         </div>
         <div style={{ marginBottom: 12 }}>
           <label style={{ fontSize: 12, fontWeight: 600, color: '#6b6860', display: 'block', marginBottom: 4 }}>PRIORIDAD</label>
@@ -262,7 +273,7 @@ function ModalNuevoPedido({ onClose, onCrear }) {
           <label style={{ fontSize: 12, fontWeight: 600, color: '#6b6860', display: 'block', marginBottom: 4 }}>OBSERVACIONES</label>
           <textarea value={form.observaciones} onChange={e => set('observaciones', e.target.value)}
             rows={3} placeholder="Descripción del problema, urgencia, etc."
-            style={{ width: '100%', border: '1.5px solid #e2dfd8', borderRadius: 8, padding: '8px 10px', fontSize: 13, fontFamily: 'inherit', outline: 'none', resize: 'none' }} />
+            style={{ width: '100%', border: '1.5px solid #e2dfd8', borderRadius: 8, padding: '8px 10px', fontSize: 13, fontFamily: 'inherit', outline: 'none', resize: 'none', boxSizing: 'border-box' }} />
         </div>
 
         {error && <div style={{ padding: '8px 12px', background: '#fff1f1', border: '1px solid #fecaca', borderRadius: 8, fontSize: 13, color: '#dc2626', marginBottom: 12 }}>⚠ {error}</div>}
@@ -282,7 +293,7 @@ function ModalNuevoPedido({ onClose, onCrear }) {
 // ─── MÓDULO PEDIDOS ───────────────────────────────────────────
 export default function ModuloPedidos() {
   const { perfil, esSuministro } = useAuth();
-  const { pedidos, loading, error, stats, crearPedido, actualizarPedido, actualizarEstado } = usePedidos();
+  const { pedidos, loading, error, crearPedido, actualizarPedido, actualizarEstado } = usePedidos();
   const [search, setSearch]           = useState('');
   const [filtroEstado, setFiltroEstado] = useState('todos');
   const [filtroPrio, setFiltroPrio]   = useState('todas');
@@ -295,7 +306,7 @@ export default function ModuloPedidos() {
   const tecnicos = [...new Set(pedidos.map(p => p.tecnico?.nombre).filter(Boolean))];
 
   const filtered = useMemo(() => {
-    return pedidos.filter(p => {
+    let list = pedidos.filter(p => {
       const q = search.toLowerCase();
       const matchSearch = !q ||
         p.repuesto?.toLowerCase().includes(q) ||
@@ -307,10 +318,31 @@ export default function ModuloPedidos() {
       const matchTec      = filtroTecnico === 'todos' || p.tecnico?.nombre === filtroTecnico;
       return matchSearch && matchEstado && matchPrio && matchTec;
     });
-  }, [pedidos, search, filtroEstado, filtroPrio, filtroTecnico]);
 
-  const totalGastado  = filtered.filter(p => p.estado !== 'devuelto').reduce((a, p) => a + (p.unitario * p.cantidad), 0);
-  const totalDevuelto = filtered.filter(p => p.estado === 'devuelto').reduce((a, p) => a + (p.devueltos * p.unitario), 0);
+    // Ordenar
+    list = [...list].sort((a, b) => {
+      let va = a[sortField], vb = b[sortField];
+      if (sortField === 'tecnico') { va = a.tecnico?.nombre || ''; vb = b.tecnico?.nombre || ''; }
+      if (sortField === 'total') {
+        va = (a.cantidad - (a.devueltos || 0)) * (a.unitario || 0);
+        vb = (b.cantidad - (b.devueltos || 0)) * (b.unitario || 0);
+      }
+      if (va < vb) return sortDir === 'asc' ? -1 : 1;
+      if (va > vb) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return list;
+  }, [pedidos, search, filtroEstado, filtroPrio, filtroTecnico, sortField, sortDir]);
+
+  // CORRECCIÓN DE CÁLCULO: solo contar pedidos entregados, excluir devueltos y no_consigue
+  const totalEntregado = filtered
+    .filter(p => p.estado === 'entregado')
+    .reduce((a, p) => a + ((p.unitario || 0) * (p.cantidad || 0)), 0);
+
+  const totalDevuelto = filtered
+    .filter(p => p.estado === 'devuelto')
+    .reduce((a, p) => a + ((p.devueltos || p.cantidad || 0) * (p.unitario || 0)), 0);
 
   const handleSort = (field) => {
     if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -373,15 +405,15 @@ export default function ModuloPedidos() {
           </div>
         </div>
 
-        {/* Métricas */}
+        {/* Métricas — solo cuenta entregados en GASTADO */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 10, marginBottom: 20 }}>
           {[
-            { label: 'TOTAL',      val: filtered.length,                                      icon: '📋', bg: '#dbeafe', c: '#2563eb' },
-            { label: 'PENDIENTES', val: filtered.filter(p => p.estado === 'pendiente').length, icon: '⏳', bg: '#fef3c7', c: '#d97706' },
-            { label: 'PEDIDOS',    val: filtered.filter(p => p.estado === 'pedido').length,    icon: '🛒', bg: '#ede9fe', c: '#7c3aed' },
-            { label: 'ENTREGADOS', val: filtered.filter(p => p.estado === 'entregado').length, icon: '📦', bg: '#dcfce7', c: '#15803d' },
-            { label: 'GASTADO',    val: fmtCOP(totalGastado),                                  icon: '💰', bg: '#dcfce7', c: '#15803d' },
-            { label: 'DEVUELTO',   val: fmtCOP(totalDevuelto),                                 icon: '↩️', bg: '#fee2e2', c: '#dc2626' },
+            { label: 'TOTAL',       val: filtered.length,                                        icon: '📋', bg: '#dbeafe', c: '#2563eb' },
+            { label: 'PENDIENTES',  val: filtered.filter(p => p.estado === 'pendiente').length,  icon: '⏳', bg: '#fef3c7', c: '#d97706' },
+            { label: 'PEDIDOS',     val: filtered.filter(p => p.estado === 'pedido').length,     icon: '🛒', bg: '#ede9fe', c: '#7c3aed' },
+            { label: 'ENTREGADOS',  val: filtered.filter(p => p.estado === 'entregado').length,  icon: '📦', bg: '#dcfce7', c: '#15803d' },
+            { label: 'GASTADO',     val: fmtCOP(totalEntregado),                                 icon: '💰', bg: '#dcfce7', c: '#15803d' },
+            { label: 'DEVUELTO',    val: fmtCOP(totalDevuelto),                                  icon: '↩️', bg: '#fee2e2', c: '#dc2626' },
           ].map(m => (
             <div key={m.label} style={{ background: '#fff', border: '1px solid #e2dfd8', borderRadius: 12, padding: '12px 14px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
@@ -455,8 +487,11 @@ export default function ModuloPedidos() {
                     No se encontraron pedidos con los filtros actuales.
                   </td></tr>
                 ) : filtered.map(p => {
-                  const total = (p.cantidad - (p.devueltos || 0)) * (p.unitario || 0);
-                  const isDevuelto = p.estado === 'devuelto';
+                  // CORRECCIÓN: el total es la cantidad entregada × unitario
+                  // Si está devuelto no suma al real, se muestra tachado
+                  const esDevuelto   = p.estado === 'devuelto';
+                  const esNoConsigue = p.estado === 'no_consigue';
+                  const totalFila    = (p.unitario || 0) * (p.cantidad || 0);
                   return (
                     <tr key={p.id} onClick={() => setSelected(p)}
                       style={{ cursor: 'pointer', borderBottom: '1px solid #f0eee9', transition: 'background .1s', background: selected?.id === p.id ? '#f7f6f3' : 'transparent' }}
@@ -488,8 +523,8 @@ export default function ModuloPedidos() {
                       <td style={{ padding: '11px 14px', fontSize: 13, fontFamily: 'monospace', color: esSuministro ? '#1a1916' : '#9c9a92' }}>
                         {p.unitario ? fmtCOP(p.unitario) : <span style={{ color: '#d97706', fontSize: 12 }}>⏳ Pendiente</span>}
                       </td>
-                      <td style={{ padding: '11px 14px', fontSize: 13, fontFamily: 'monospace', fontWeight: 700, color: isDevuelto ? '#9c9a92' : '#1a1916', textDecoration: isDevuelto ? 'line-through' : 'none' }}>
-                        {total ? fmtCOP(total) : '—'}
+                      <td style={{ padding: '11px 14px', fontSize: 13, fontFamily: 'monospace', fontWeight: 700, color: (esDevuelto || esNoConsigue) ? '#9c9a92' : '#1a1916', textDecoration: (esDevuelto || esNoConsigue) ? 'line-through' : 'none' }}>
+                        {totalFila ? fmtCOP(totalFila) : '—'}
                       </td>
                       <td style={{ padding: '11px 14px', fontSize: 12, color: '#9c9a92', whiteSpace: 'nowrap' }}>
                         {tiempoRelativo(p.created_at)}
@@ -509,7 +544,7 @@ export default function ModuloPedidos() {
           <div style={{ padding: '12px 16px', borderTop: '1px solid #e2dfd8', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fafaf9', flexWrap: 'wrap', gap: 8 }}>
             <span style={{ fontSize: 12.5, color: '#9c9a92' }}>{filtered.length} de {pedidos.length} pedidos</span>
             <span style={{ fontSize: 12.5, color: '#6b6860', fontFamily: 'monospace' }}>
-              Total: <strong>{fmtCOP(totalGastado)}</strong>
+              Entregado: <strong>{fmtCOP(totalEntregado)}</strong>
               {totalDevuelto > 0 && <span style={{ color: '#dc2626', marginLeft: 8 }}>↩ −{fmtCOP(totalDevuelto)}</span>}
             </span>
           </div>

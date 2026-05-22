@@ -82,13 +82,16 @@ export function usePedidos({ filtros = {} } = {}) {
   };
 
   // Estadísticas calculadas en memoria desde los datos ya cargados
+  // CORRECCIÓN: gasto_total solo cuenta pedidos ENTREGADOS
   const stats = {
     total:       pedidos.length,
     pendientes:  pedidos.filter(p => p.estado === 'pendiente').length,
     pedidos_est: pedidos.filter(p => p.estado === 'pedido').length,
     entregados:  pedidos.filter(p => p.estado === 'entregado').length,
     urgentes:    pedidos.filter(p => p.prioridad === 'urgente').length,
-    gasto_total: pedidos.reduce((acc, p) => acc + (p.unitario * p.cantidad), 0),
+    gasto_total: pedidos
+      .filter(p => p.estado === 'entregado')
+      .reduce((acc, p) => acc + ((p.unitario || 0) * (p.cantidad || 0)), 0),
   };
 
   return {
@@ -354,6 +357,7 @@ export function useDashboardStats() {
         supabase.from('pedidos').select('*', { count: 'exact', head: true }),
         supabase.from('pedidos').select('*', { count: 'exact', head: true }).eq('estado', 'pendiente'),
         supabase.from('pedidos').select('*', { count: 'exact', head: true }).eq('prioridad', 'urgente'),
+        // Solo pedidos ENTREGADOS para el gasto real
         supabase.from('pedidos').select('unitario, cantidad').eq('estado', 'entregado'),
         supabase
           .from('auditoria')
