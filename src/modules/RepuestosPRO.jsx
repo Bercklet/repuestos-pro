@@ -1,9 +1,10 @@
 // src/modules/RepuestosPRO.jsx
 // Dashboard principal en tiempo real — sin datos mock
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useDashboardStats, usePedidos, useRepuestos } from '../hooks/useData';
 import { fmtCOP, fmtNumPedido, tiempoRelativo } from '../lib/supabase';
+import { sugerirMarcas, sugerirModelos, sugerirComponentes } from '../lib/marcas';
 
 const ESTADO_CFG = {
   pendiente:   { label: 'Pendiente',   bg: '#fef3c7', color: '#d97706', dot: '#d97706' },
@@ -18,6 +19,48 @@ const PRIO_CFG = {
   alta:    { label: 'Alta',    bg: '#fef3c7', color: '#d97706' },
   normal:  { label: 'Normal',  bg: '#f4f3f0', color: '#9c9a92' },
 };
+
+// ── AutoInput con sugerencias ──────────────────────────────────
+function AutoInput({ label, value, onChange, sugerir, placeholder }) {
+  const [open, setOpen]   = useState(false);
+  const [lista, setLista] = useState([]);
+  const ref               = useRef(null);
+
+  useEffect(() => { setLista(sugerir(value)); }, [value]);
+
+  useEffect(() => {
+    const h = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, []);
+
+  return (
+    <div ref={ref} style={{ position: 'relative', marginBottom: 12 }}>
+      <label style={{ fontSize: 12, fontWeight: 600, color: '#6b6860', display: 'block', marginBottom: 4 }}>{label}</label>
+      <input
+        value={value}
+        onChange={e => { onChange(e.target.value); setOpen(true); }}
+        onFocus={() => setOpen(true)}
+        placeholder={placeholder}
+        autoComplete="off"
+        style={{ width: '100%', border: '1.5px solid #e2dfd8', borderRadius: 8, padding: '8px 10px', fontSize: 13, fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }}
+      />
+      {open && lista.length > 0 && (
+        <div style={{ position: 'absolute', top: 'calc(100% + 2px)', left: 0, right: 0, background: '#fff', border: '1px solid #e2dfd8', borderRadius: 9, boxShadow: '0 6px 20px rgba(0,0,0,.1)', zIndex: 600, maxHeight: 190, overflowY: 'auto' }}>
+          {lista.map(item => (
+            <div key={item}
+              onMouseDown={() => { onChange(item); setOpen(false); }}
+              style={{ padding: '8px 12px', fontSize: 13, cursor: 'pointer', borderBottom: '1px solid #f7f6f3' }}
+              onMouseEnter={e => e.currentTarget.style.background = '#f7f6f3'}
+              onMouseLeave={e => e.currentTarget.style.background = '#fff'}>
+              {item}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function Badge({ cfg }) {
   return (
@@ -83,18 +126,19 @@ export default function RepuestosPRO({ onNavigate }) {
 
   const loading = loadingStats || loadingPedidos || loadingReps;
 
-  // ─── CREAR PEDIDO (modal simple) ──────────────────────────
-  const [formPedido, setFormPedido] = useState({ repuesto: '', marca: '', tipo: 'OEM', cantidad: 1, prioridad: 'normal', observaciones: '' });
+  // ─── CREAR PEDIDO (modal con autocompletado) ──────────────────
+  const [formPedido, setFormPedido] = useState({ repuesto: '', marca: '', modelo: '', tipo: 'OEM', cantidad: 1, prioridad: 'normal', observaciones: '' });
+  const setF = useCallback((k, v) => setFormPedido(prev => ({ ...prev, [k]: v })), []);
   const [creando, setCreando]       = useState(false);
   const [errorCrear, setErrorCrear] = useState('');
 
   const handleCrearPedido = async () => {
-    if (!formPedido.repuesto.trim()) { setErrorCrear('El nombre del repuesto es obligatorio'); return; }
+    if (!formPedido.repuesto.trim()) { setErrorCrear('El componente/repuesto es obligatorio'); return; }
     setCreando(true); setErrorCrear('');
     try {
       await crearPedido({ ...formPedido, tecnico_id: perfil.id, cantidad: Number(formPedido.cantidad) });
       setModalNuevo(false);
-      setFormPedido({ repuesto: '', marca: '', tipo: 'OEM', cantidad: 1, prioridad: 'normal', observaciones: '' });
+      setFormPedido({ repuesto: '', marca: '', modelo: '', tipo: 'OEM', cantidad: 1, prioridad: 'normal', observaciones: '' });
     } catch (e) {
       setErrorCrear(e.message);
     } finally {
@@ -283,61 +327,87 @@ export default function RepuestosPRO({ onNavigate }) {
         </div>
       </div>
 
-      {/* Modal nuevo pedido */}
+      {/* Modal nuevo pedido — con autocompletado de marcas/modelos/componentes */}
       {modalNuevo && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.4)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
           onClick={() => setModalNuevo(false)}>
-          <div style={{ background: '#fff', borderRadius: 16, width: '100%', maxWidth: 460, padding: 28 }}
+          <div style={{ background: '#fff', borderRadius: 16, width: '100%', maxWidth: 500, maxHeight: '92vh', overflowY: 'auto', padding: 28 }}
             onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
               <div style={{ fontSize: 16, fontWeight: 700 }}>+ Nuevo pedido</div>
               <button onClick={() => setModalNuevo(false)} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#9c9a92' }}>×</button>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {[
-                { label: 'REPUESTO *', key: 'repuesto', placeholder: 'Ej: Pantalla Samsung A54' },
-                { label: 'MARCA',      key: 'marca',    placeholder: 'Samsung, Apple, Xiaomi…' },
-              ].map(f => (
-                <div key={f.key}>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: '#6b6860', display: 'block', marginBottom: 4 }}>{f.label}</label>
-                  <input value={formPedido[f.key]} onChange={e => setFormPedido(p => ({ ...p, [f.key]: e.target.value }))} placeholder={f.placeholder}
-                    style={{ width: '100%', border: '1.5px solid #e2dfd8', borderRadius: 8, padding: '8px 10px', fontSize: 13, fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }} />
-                </div>
-              ))}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                <div>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: '#6b6860', display: 'block', marginBottom: 4 }}>CANTIDAD</label>
-                  <input type="number" min="1" value={formPedido.cantidad} onChange={e => setFormPedido(p => ({ ...p, cantidad: e.target.value }))}
-                    style={{ width: '100%', border: '1.5px solid #e2dfd8', borderRadius: 8, padding: '8px 10px', fontSize: 13, fontFamily: 'inherit', outline: 'none' }} />
-                </div>
-                <div>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: '#6b6860', display: 'block', marginBottom: 4 }}>TIPO</label>
-                  <select value={formPedido.tipo} onChange={e => setFormPedido(p => ({ ...p, tipo: e.target.value }))}
-                    style={{ width: '100%', border: '1.5px solid #e2dfd8', borderRadius: 8, padding: '8px 10px', fontSize: 13, fontFamily: 'inherit', outline: 'none' }}>
-                    {['Original', 'OEM', 'Genérico', 'Recuperado'].map(t => <option key={t}>{t}</option>)}
-                  </select>
-                </div>
+
+            {/* Marca */}
+            <AutoInput
+              label="MARCA"
+              value={formPedido.marca}
+              onChange={v => { setF('marca', v); setF('modelo', ''); }}
+              sugerir={sugerirMarcas}
+              placeholder="Ej: Samsung, iPhone, Xiaomi…"
+            />
+
+            {/* Modelo */}
+            <AutoInput
+              label="MODELO"
+              value={formPedido.modelo}
+              onChange={v => setF('modelo', v)}
+              sugerir={v => sugerirModelos(formPedido.marca, v)}
+              placeholder={formPedido.marca ? `Modelos de ${formPedido.marca}…` : 'Primero selecciona una marca'}
+            />
+
+            {/* Componente */}
+            <AutoInput
+              label="COMPONENTE / REPUESTO *"
+              value={formPedido.repuesto}
+              onChange={v => setF('repuesto', v)}
+              sugerir={sugerirComponentes}
+              placeholder="Ej: Pantalla completa, Batería…"
+            />
+
+            {/* Preview referencia */}
+            {(formPedido.marca || formPedido.modelo || formPedido.repuesto) && (
+              <div style={{ padding: '8px 12px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, fontSize: 12.5, color: '#15803d', marginBottom: 12, fontWeight: 500 }}>
+                📦 {[formPedido.marca, formPedido.modelo, formPedido.repuesto].filter(Boolean).join(' › ')}
+              </div>
+            )}
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: '#6b6860', display: 'block', marginBottom: 4 }}>CANTIDAD</label>
+                <input type="number" min="1" value={formPedido.cantidad} onChange={e => setF('cantidad', e.target.value)}
+                  style={{ width: '100%', border: '1.5px solid #e2dfd8', borderRadius: 8, padding: '8px 10px', fontSize: 13, fontFamily: 'inherit', outline: 'none' }} />
               </div>
               <div>
-                <label style={{ fontSize: 12, fontWeight: 600, color: '#6b6860', display: 'block', marginBottom: 6 }}>PRIORIDAD</label>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  {Object.entries(PRIO_CFG).map(([k, v]) => (
-                    <button key={k} onClick={() => setFormPedido(p => ({ ...p, prioridad: k }))}
-                      style={{ flex: 1, padding: '7px 0', borderRadius: 8, border: `1.5px solid ${formPedido.prioridad === k ? v.color : '#e2dfd8'}`, background: formPedido.prioridad === k ? v.bg : '#fff', color: v.color, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
-                      {v.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <label style={{ fontSize: 12, fontWeight: 600, color: '#6b6860', display: 'block', marginBottom: 4 }}>OBSERVACIONES</label>
-                <textarea value={formPedido.observaciones} onChange={e => setFormPedido(p => ({ ...p, observaciones: e.target.value }))}
-                  rows={2} placeholder="Descripción del problema o urgencia"
-                  style={{ width: '100%', border: '1.5px solid #e2dfd8', borderRadius: 8, padding: '8px 10px', fontSize: 13, fontFamily: 'inherit', outline: 'none', resize: 'none', boxSizing: 'border-box' }} />
+                <label style={{ fontSize: 12, fontWeight: 600, color: '#6b6860', display: 'block', marginBottom: 4 }}>TIPO / CALIDAD</label>
+                <select value={formPedido.tipo} onChange={e => setF('tipo', e.target.value)}
+                  style={{ width: '100%', border: '1.5px solid #e2dfd8', borderRadius: 8, padding: '8px 10px', fontSize: 13, fontFamily: 'inherit', outline: 'none' }}>
+                  {['Original', 'OEM', 'Genérico', 'Recuperado'].map(t => <option key={t}>{t}</option>)}
+                </select>
               </div>
             </div>
-            {errorCrear && <div style={{ padding: '8px 12px', background: '#fff1f1', border: '1px solid #fecaca', borderRadius: 8, fontSize: 13, color: '#dc2626', marginTop: 12 }}>⚠ {errorCrear}</div>}
-            <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
+
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: '#6b6860', display: 'block', marginBottom: 6 }}>PRIORIDAD</label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {Object.entries(PRIO_CFG).map(([k, v]) => (
+                  <button key={k} onClick={() => setF('prioridad', k)}
+                    style={{ flex: 1, padding: '7px 0', borderRadius: 8, border: `1.5px solid ${formPedido.prioridad === k ? v.color : '#e2dfd8'}`, background: formPedido.prioridad === k ? v.bg : '#fff', color: v.color, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                    {v.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: '#6b6860', display: 'block', marginBottom: 4 }}>OBSERVACIONES</label>
+              <textarea value={formPedido.observaciones} onChange={e => setF('observaciones', e.target.value)}
+                rows={2} placeholder="Descripción del daño, urgencia, referencia adicional…"
+                style={{ width: '100%', border: '1.5px solid #e2dfd8', borderRadius: 8, padding: '8px 10px', fontSize: 13, fontFamily: 'inherit', outline: 'none', resize: 'none', boxSizing: 'border-box' }} />
+            </div>
+
+            {errorCrear && <div style={{ padding: '8px 12px', background: '#fff1f1', border: '1px solid #fecaca', borderRadius: 8, fontSize: 13, color: '#dc2626', marginBottom: 12 }}>⚠ {errorCrear}</div>}
+            <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => setModalNuevo(false)} style={{ flex: 1, padding: '10px', background: '#f0eee9', color: '#6b6860', border: 'none', borderRadius: 9, fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>Cancelar</button>
               <button onClick={handleCrearPedido} disabled={creando}
                 style={{ flex: 2, padding: '10px', background: '#1a1916', color: '#fff', border: 'none', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
