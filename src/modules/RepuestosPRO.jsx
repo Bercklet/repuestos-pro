@@ -141,7 +141,7 @@ export default function RepuestosPRO({ onNavigate }) {
             { label: 'PENDIENTES',    val: stats?.pendientes || 0,  icon: '⏳', bg: '#fef3c7', c: '#d97706', onClick: () => onNavigate?.('pedidos') },
             { label: 'URGENTES',      val: stats?.urgentes || 0,    icon: '🚨', bg: '#fee2e2', c: '#dc2626', onClick: () => onNavigate?.('pedidos') },
             { label: 'TOTAL PEDIDOS', val: stats?.total || 0,       icon: '📦', bg: '#ede9fe', c: '#7c3aed', onClick: () => onNavigate?.('pedidos') },
-            { label: 'GASTO TOTAL',   val: fmtCOP(stats?.gastoTotal || 0), icon: '💰', bg: '#dcfce7', c: '#15803d', onClick: null },
+            { label: 'GASTO REAL',    val: fmtCOP(stats?.gastoTotal || 0), icon: '💰', bg: '#dcfce7', c: '#15803d', onClick: null },
           ].map(k => (
             <div key={k.label} onClick={k.onClick}
               style={{ background: '#fff', border: '1px solid #e2dfd8', borderRadius: 14, padding: '14px 16px', cursor: k.onClick ? 'pointer' : 'default', transition: 'border-color .15s' }}
