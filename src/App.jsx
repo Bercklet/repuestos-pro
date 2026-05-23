@@ -451,8 +451,38 @@ function AppInner() {
         <div style={{
           flex: 1, overflowY: 'auto',
           paddingBottom: isMobile ? 72 : 0,
+          display: 'flex', flexDirection: 'column',
         }}>
-          <Component user={perfil} perfil={perfil} onNavigate={handleSetActive} />
+          <div style={{ flex: 1 }}>
+            <Component user={perfil} perfil={perfil} onNavigate={handleSetActive} />
+          </div>
+
+          {/* ── Footer ── */}
+          <footer style={{
+            padding: '16px 24px',
+            borderTop: '1px solid #e2dfd8',
+            background: '#fafaf9',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+          }}>
+            <span style={{ fontSize: 12.5, color: '#9c9a92' }}>
+              Desarrollado por{' '}
+              <strong style={{ color: '#6b6860', fontWeight: 600 }}>Maycol Andrés Infante</strong>
+              {' — '}
+              <a
+                href="#"
+                onClick={e => e.preventDefault()}
+                title="Sitio web próximamente"
+                style={{ color: '#1a1916', fontWeight: 600, textDecoration: 'none', borderBottom: '1.5px solid #1a1916', paddingBottom: 1, transition: 'opacity .15s' }}
+                onMouseEnter={e => e.currentTarget.style.opacity = '0.6'}
+                onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+              >
+                Infantech
+              </a>
+            </span>
+          </footer>
         </div>
       </div>
 
