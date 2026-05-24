@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { usePedidos, useComentariosPedido } from '../hooks/useData';
 import { fmtCOP, fmtNumPedido, tiempoRelativo } from '../lib/supabase';
 import { sugerirMarcasCompleto, sugerirModelosCompleto, sugerirComponentes, claveAgrupacion } from '../lib/marcas';
-import ModalNuevoPedido from '../components/ModalNuevoPedido';
+import ModalNuevoPedido from './ModalNuevoPedido';
 
 const ESTADOS = {
   pendiente:   { label:'Pendiente',   bg:'#fef3c7', color:'#d97706', dot:'#d97706' },

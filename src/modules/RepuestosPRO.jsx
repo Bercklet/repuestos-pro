@@ -4,7 +4,7 @@ import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useDashboardStats, usePedidos, useRepuestos } from '../hooks/useData';
 import { fmtCOP, fmtNumPedido, tiempoRelativo } from '../lib/supabase';
-import ModalNuevoPedido from '../components/ModalNuevoPedido';
+import ModalNuevoPedido from './ModalNuevoPedido';
 
 const ESTADO_CFG = {
   pendiente:   { label:'Pendiente',   bg:'#fef3c7', color:'#d97706', dot:'#d97706' },
