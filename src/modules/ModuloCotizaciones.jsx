@@ -32,7 +32,7 @@ function useCotizaciones() {
       { data: provs },
       { data: peds },
     ] = await Promise.all([
-      supabase.from('cotizaciones').select('*, proveedor:proveedores(id,nombre,telefono)').order('created_at', { ascending: false }),
+      supabase.from('cotizaciones').select('*, proveedor:proveedores(id,nombre,apodo,telefono,whatsapp)').order('created_at', { ascending: false }),
       supabase.from('pagos_pedido').select('*, proveedor:proveedores(nombre), pedido:pedidos(numero,repuesto,marca,modelo)').order('created_at', { ascending: false }),
       supabase.from('proveedores').select('id,nombre,telefono').eq('estado','activo').order('nombre'),
       supabase.from('pedidos').select('id,numero,repuesto,marca,modelo,unitario,cantidad,estado').eq('estado','entregado').order('numero', { ascending: false }).limit(200),
@@ -520,64 +520,116 @@ export default function ModuloCotizaciones() {
                   )}
                 </div>
 
-                {/* Tabla de cotizaciones — ordenadas por precio */}
+                {/* ── Comparador ✓/✗ por proveedor ── */}
                 <div style={{ overflowX:'auto' }}>
+                  {/* Resumen visual del ganador si hay uno seleccionado */}
+                  {g.items.some(c => c.seleccionada) && (() => {
+                    const ganador = g.items.find(c => c.seleccionada);
+                    return (
+                      <div style={{ margin:'0 14px 10px', padding:'10px 14px', background:'#f0fdf4', border:'1.5px solid #15803d', borderRadius:10, display:'flex', alignItems:'center', gap:12 }}>
+                        <span style={{ fontSize:20 }}>✅</span>
+                        <div style={{ flex:1 }}>
+                          <div style={{ fontSize:11, fontWeight:700, color:'#15803d', marginBottom:2 }}>PROVEEDOR SELECCIONADO</div>
+                          <div style={{ fontSize:14, fontWeight:700 }}>{ganador.proveedor?.apodo || ganador.proveedor?.nombre || '—'}</div>
+                          {ganador.proveedor?.nombre && ganador.proveedor?.apodo && (
+                            <div style={{ fontSize:11, color:'#6b6860' }}>{ganador.proveedor.nombre}</div>
+                          )}
+                        </div>
+                        <div style={{ textAlign:'right', flexShrink:0 }}>
+                          <div style={{ fontSize:11, color:'#15803d', fontWeight:600 }}>PRECIO ACEPTADO</div>
+                          <div style={{ fontSize:16, fontWeight:700, fontFamily:'monospace', color:'#1a1916' }}>{fmtCOP(ganador.precio)}</div>
+                          <div style={{ fontSize:11, color:'#6b6860' }}>{ganador.calidad} · {ganador.tiempo_entrega || 'Tiempo N/A'}</div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
                   <table style={{ width:'100%', borderCollapse:'collapse', minWidth:500 }}>
                     <thead>
                       <tr style={{ background:'#fafaf9' }}>
-                        {['PROVEEDOR','PRECIO','TIEMPO','DISPONIBLE','FECHA',''].map(h => (
-                          <th key={h} style={{ fontSize:10.5, fontWeight:700, color:'#9c9a92', textAlign:'left', padding:'8px 14px', borderBottom:'1px solid #f0eee9', letterSpacing:'.3px', whiteSpace:'nowrap' }}>{h}</th>
+                        {['','PROVEEDOR','PRECIO','CALIDAD','TIEMPO','FECHA','ACCIÓN'].map(h => (
+                          <th key={h} style={{ fontSize:10.5, fontWeight:700, color:'#9c9a92', textAlign:'left', padding:'8px 12px', borderBottom:'1px solid #f0eee9', letterSpacing:'.3px', whiteSpace:'nowrap' }}>{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
-                      {g.items.map((c, i) => (
-                        <tr key={c.id} style={{ borderBottom: i<g.items.length-1?'1px solid #f7f6f3':'none', background: i===0?'#f0fdf4':'#fff' }}>
-                          <td style={{ padding:'10px 14px' }}>
-                            <div style={{ fontSize:13, fontWeight:600 }}>{c.proveedor?.nombre || '—'}</div>
-                            {c.notas && <div style={{ fontSize:11, color:'#9c9a92', marginTop:1 }}>{c.notas}</div>}
-                          </td>
-                          <td style={{ padding:'10px 14px' }}>
-                            <div style={{ fontSize:14, fontWeight:700, fontFamily:'monospace', color: i===0?'#15803d':'#1a1916' }}>
-                              {fmtCOP(c.precio)}
-                              {i===0 && g.items.length>1 && <span style={{ fontSize:10, marginLeft:5, background:'#dcfce7', color:'#15803d', padding:'1px 5px', borderRadius:99, fontWeight:600 }}>MEJOR</span>}
-                            </div>
-                          </td>
-                          <td style={{ padding:'10px 14px', fontSize:12.5, color:'#6b6860' }}>{c.tiempo_entrega || '—'}</td>
-                          <td style={{ padding:'10px 14px' }}>
-                            <span style={{ fontSize:12, color: c.disponible?'#15803d':'#dc2626', fontWeight:600 }}>
-                              {c.disponible ? '✓ Sí' : '✗ No'}
-                            </span>
-                          </td>
-                          <td style={{ padding:'10px 14px', fontSize:11.5, color:'#9c9a92' }}>{tiempoRelativo(c.created_at)}</td>
-                          <td style={{ padding:'10px 14px' }}>
-                            {esSuministro && (
-                              <div style={{ display:'flex', gap:5 }}>
-                                {/* ✓ Aceptar — crea pedido automáticamente */}
-                                <button
-                                  onClick={() => seleccionarCotizacion(c.id, c.pedido_id)}
-                                  title={c.seleccionada ? 'Aceptado — click para deshacer' : 'Aceptar esta cotización y crear pedido'}
-                                  style={{
-                                    padding:'5px 10px', borderRadius:7,
-                                    border: c.seleccionada ? 'none' : '1px solid #bbf7d0',
-                                    background: c.seleccionada ? '#15803d' : '#f0fdf4',
-                                    color: c.seleccionada ? '#fff' : '#15803d',
-                                    fontSize:13, fontWeight:700, cursor:'pointer',
-                                    transition:'all .15s',
-                                  }}>
-                                  ✓
-                                </button>
-                                {/* Label de estado */}
-                                {c.seleccionada && (
-                                  <span style={{ fontSize:11, color:'#15803d', fontWeight:600, alignSelf:'center', whiteSpace:'nowrap' }}>
-                                    Pedido creado
-                                  </span>
-                                )}
+                      {g.items.map((c, i) => {
+                        const hayGanador  = g.items.some(x => x.seleccionada);
+                        const esGanador   = c.seleccionada;
+                        const esDescartado = hayGanador && !esGanador;
+                        const nombreProv  = c.proveedor?.apodo || c.proveedor?.nombre || '—';
+                        return (
+                          <tr key={c.id} style={{
+                            borderBottom: i<g.items.length-1?'1px solid #f7f6f3':'none',
+                            background: esGanador ? '#f0fdf4' : esDescartado ? '#fafafa' : i===0?'#fffdf0':'#fff',
+                            opacity: esDescartado ? 0.5 : 1,
+                            transition: 'all .2s',
+                          }}>
+                            {/* Indicador visual */}
+                            <td style={{ padding:'10px 12px', width:32 }}>
+                              {esGanador   && <span style={{ fontSize:16 }}>✅</span>}
+                              {esDescartado && <span style={{ fontSize:16 }}>❌</span>}
+                              {!hayGanador && i===0 && g.items.length>1 && (
+                                <span title="Precio más bajo" style={{ fontSize:14 }}>⭐</span>
+                              )}
+                            </td>
+                            {/* Proveedor */}
+                            <td style={{ padding:'10px 12px' }}>
+                              <div style={{ fontSize:13, fontWeight:esGanador?700:600, color: esGanador?'#15803d': esDescartado?'#9c9a92':'#1a1916' }}>
+                                {nombreProv}
                               </div>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
+                              {c.proveedor?.nombre && c.proveedor?.apodo && (
+                                <div style={{ fontSize:11, color:'#9c9a92' }}>{c.proveedor.nombre}</div>
+                              )}
+                              {c.notas && <div style={{ fontSize:11, color:'#9c9a92', marginTop:1, fontStyle:'italic' }}>{c.notas}</div>}
+                              {c.proveedor?.telefono && (
+                                <div style={{ fontSize:11, color:'#2563eb', marginTop:1 }}>📞 {c.proveedor.telefono}</div>
+                              )}
+                            </td>
+                            {/* Precio */}
+                            <td style={{ padding:'10px 12px' }}>
+                              <div style={{ fontSize:14, fontWeight:700, fontFamily:'monospace',
+                                color: esGanador?'#15803d': esDescartado?'#9c9a92': i===0?'#15803d':'#1a1916',
+                                textDecoration: esDescartado?'line-through':'none' }}>
+                                {fmtCOP(c.precio)}
+                              </div>
+                              {!hayGanador && i===0 && g.items.length>1 && (
+                                <span style={{ fontSize:10, background:'#dcfce7', color:'#15803d', padding:'1px 5px', borderRadius:99, fontWeight:600 }}>MÁS BARATO</span>
+                              )}
+                              {!hayGanador && i===g.items.length-1 && g.items.length>1 && (
+                                <span style={{ fontSize:10, background:'#fff1f1', color:'#dc2626', padding:'1px 5px', borderRadius:99, fontWeight:600 }}>MÁS CARO</span>
+                              )}
+                            </td>
+                            <td style={{ padding:'10px 12px', fontSize:12, color:'#6b6860' }}>{c.calidad}</td>
+                            <td style={{ padding:'10px 12px', fontSize:12, color:'#6b6860' }}>{c.tiempo_entrega || '—'}</td>
+                            <td style={{ padding:'10px 12px', fontSize:11, color:'#9c9a92', whiteSpace:'nowrap' }}>{tiempoRelativo(c.created_at)}</td>
+                            {/* Botones ✓ / ✗ */}
+                            <td style={{ padding:'10px 12px' }}>
+                              {esSuministro && (
+                                <div style={{ display:'flex', gap:5, alignItems:'center' }}>
+                                  {/* ✓ Aceptar */}
+                                  <button
+                                    onClick={() => seleccionarCotizacion(c.id, c.pedido_id)}
+                                    title={esGanador ? 'Aceptado — clic para revertir' : 'Aceptar este proveedor'}
+                                    style={{
+                                      width:32, height:32, borderRadius:8, fontSize:15, fontWeight:700,
+                                      cursor:'pointer', transition:'all .15s', display:'flex', alignItems:'center', justifyContent:'center',
+                                      border: esGanador ? 'none' : '1.5px solid #bbf7d0',
+                                      background: esGanador ? '#15803d' : '#f0fdf4',
+                                      color: esGanador ? '#fff' : '#15803d',
+                                    }}>
+                                    ✓
+                                  </button>
+                                  {/* ✗ solo visible si hay ganador y este NO es el ganador */}
+                                  {esDescartado && (
+                                    <span style={{ fontSize:18, color:'#dc2626' }} title="Descartado">✗</span>
+                                  )}
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
