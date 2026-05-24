@@ -1,6 +1,6 @@
 // src/modules/RepuestosPRO.jsx
 // Dashboard principal en tiempo real
-import { useState } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useDashboardStats, usePedidos, useRepuestos } from '../hooks/useData';
 import { fmtCOP, fmtNumPedido, tiempoRelativo } from '../lib/supabase';
