@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { supabase, fmtCOP, tiempoRelativo } from '../lib/supabase';
+import { usePedidos } from '../hooks/useData';
 
 const METODOS_PAGO = ['Efectivo','Transferencia','Nequi','Daviplata','Cheque','Otro'];
 const CALIDADES    = ['Original','OEM','Genérico','Recuperado'];
@@ -52,17 +53,63 @@ function useCotizaciones() {
   };
 
   const seleccionarCotizacion = async (id, pedidoId) => {
-    // Desmarcar todas las de este pedido + referencia, marcar la seleccionada
     const cot = cotizaciones.find(c => c.id === id);
     if (!cot) return;
+
+    // Si ya estaba elegida, deseleccionar
+    if (cot.seleccionada) {
+      await supabase.from('cotizaciones').update({ seleccionada: false }).eq('id', id);
+      await cargar();
+      return;
+    }
+
+    // Desmarcar todas las cotizaciones de esta misma referencia
     await supabase.from('cotizaciones')
       .update({ seleccionada: false })
-      .eq('marca', cot.marca).eq('modelo', cot.modelo).eq('repuesto', cot.repuesto);
+      .eq('marca', cot.marca || '')
+      .eq('modelo', cot.modelo || '')
+      .eq('repuesto', cot.repuesto);
+
+    // Marcar la seleccionada
     await supabase.from('cotizaciones').update({ seleccionada: true }).eq('id', id);
-    // Si tiene pedido vinculado, actualizar el precio unitario
+
+    // Si tiene pedido vinculado → solo actualizar precio y proveedor
     if (pedidoId) {
-      await supabase.from('pedidos').update({ unitario: cot.precio, proveedor_id: cot.proveedor_id }).eq('id', pedidoId);
+      await supabase.from('pedidos')
+        .update({ unitario: cot.precio, proveedor_id: cot.proveedor_id, estado: 'pedido' })
+        .eq('id', pedidoId);
+
+    } else {
+      // Si NO tiene pedido vinculado → CREAR el pedido automáticamente en estado "pedido"
+      const { data: perfData } = await supabase.auth.getUser();
+      const tecnicoId = perfData?.user?.id;
+
+      const { data: nuevoPedido, error: errP } = await supabase
+        .from('pedidos')
+        .insert({
+          repuesto:     cot.repuesto,
+          marca:        cot.marca    || '',
+          modelo:       cot.modelo   || '',
+          tipo:         cot.calidad  || 'OEM',
+          cantidad:     1,
+          prioridad:    'normal',
+          estado:       'pedido',           // ← entra directo como "Pedido"
+          unitario:     cot.precio,
+          proveedor_id: cot.proveedor_id,
+          tecnico_id:   tecnicoId,
+          observaciones: `Aceptado desde cotizaciones · Proveedor: ${cot.proveedor?.nombre || ''}`,
+        })
+        .select()
+        .single();
+
+      if (errP) throw errP;
+
+      // Vincular la cotización al pedido recién creado
+      await supabase.from('cotizaciones')
+        .update({ pedido_id: nuevoPedido.id })
+        .eq('id', id);
     }
+
     await cargar();
   };
 
@@ -505,10 +552,28 @@ export default function ModuloCotizaciones() {
                           <td style={{ padding:'10px 14px', fontSize:11.5, color:'#9c9a92' }}>{tiempoRelativo(c.created_at)}</td>
                           <td style={{ padding:'10px 14px' }}>
                             {esSuministro && (
-                              <button onClick={() => seleccionarCotizacion(c.id, c.pedido_id)}
-                                style={{ padding:'4px 10px', borderRadius:7, border: c.seleccionada?'none':'1px solid #e2dfd8', background: c.seleccionada?'#1a1916':'transparent', color: c.seleccionada?'#fff':'#6b6860', fontSize:11.5, fontFamily:'inherit', cursor:'pointer', fontWeight: c.seleccionada?600:400 }}>
-                                {c.seleccionada ? '✓ Elegido' : 'Elegir'}
-                              </button>
+                              <div style={{ display:'flex', gap:5 }}>
+                                {/* ✓ Aceptar — crea pedido automáticamente */}
+                                <button
+                                  onClick={() => seleccionarCotizacion(c.id, c.pedido_id)}
+                                  title={c.seleccionada ? 'Aceptado — click para deshacer' : 'Aceptar esta cotización y crear pedido'}
+                                  style={{
+                                    padding:'5px 10px', borderRadius:7,
+                                    border: c.seleccionada ? 'none' : '1px solid #bbf7d0',
+                                    background: c.seleccionada ? '#15803d' : '#f0fdf4',
+                                    color: c.seleccionada ? '#fff' : '#15803d',
+                                    fontSize:13, fontWeight:700, cursor:'pointer',
+                                    transition:'all .15s',
+                                  }}>
+                                  ✓
+                                </button>
+                                {/* Label de estado */}
+                                {c.seleccionada && (
+                                  <span style={{ fontSize:11, color:'#15803d', fontWeight:600, alignSelf:'center', whiteSpace:'nowrap' }}>
+                                    Pedido creado
+                                  </span>
+                                )}
+                              </div>
                             )}
                           </td>
                         </tr>
