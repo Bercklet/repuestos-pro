@@ -115,7 +115,12 @@ function DetallePedido({ pedido, onClose, onUpdate, onCambiarEstado, puedeEditar
   const [guardando, setGuardando]                = useState(false);
   const [error, setError]                        = useState('');
 
+  const sinPrecio      = Number(precio) <= 0;
+  const intentaEntregado = estado === 'entregado';
+  const bloqueado      = intentaEntregado && sinPrecio;
+
   const guardar = async () => {
+    if (bloqueado) { setError('Debes ingresar el valor unitario antes de marcar como Entregado'); return; }
     setGuardando(true); setError('');
     try { await onUpdate(pedido.id,{unitario:Number(precio),estado}); }
     catch(e) { setError(e.message); }
@@ -156,6 +161,24 @@ function DetallePedido({ pedido, onClose, onUpdate, onCambiarEstado, puedeEditar
               </div>
             ))}
           </div>
+          {/* Proveedor asignado */}
+          {pedido.proveedor?.nombre && (
+            <div style={{background:'#ede9fe',border:'1px solid #c4b5fd',borderRadius:9,padding:'10px 14px',display:'flex',alignItems:'center',gap:10}}>
+              <span style={{fontSize:18}}>🏪</span>
+              <div style={{flex:1}}>
+                <div style={{fontSize:11,color:'#7c3aed',fontWeight:700,marginBottom:1}}>PROVEEDOR ASIGNADO</div>
+                <div style={{fontSize:14,fontWeight:700,color:'#1a1916'}}>{pedido.proveedor.nombre}</div>
+                {pedido.proveedor.telefono && <div style={{fontSize:12,color:'#7c3aed',marginTop:1}}>📞 {pedido.proveedor.telefono}</div>}
+              </div>
+              {pedido.unitario > 0 && (
+                <div style={{textAlign:'right',flexShrink:0}}>
+                  <div style={{fontSize:11,color:'#7c3aed',fontWeight:600}}>PRECIO PACTADO</div>
+                  <div style={{fontSize:15,fontWeight:700,fontFamily:'monospace',color:'#1a1916'}}>{fmtCOP(pedido.unitario)}</div>
+                </div>
+              )}
+            </div>
+          )}
+
           {pedido.observaciones && (
             <div style={{background:'#fef3c7',border:'1px solid #fde68a',borderRadius:9,padding:'10px 12px'}}>
               <div style={{fontSize:11,color:'#d97706',fontWeight:600,marginBottom:3}}>OBSERVACIONES</div>
@@ -167,17 +190,32 @@ function DetallePedido({ pedido, onClose, onUpdate, onCambiarEstado, puedeEditar
               <div style={{fontSize:13,fontWeight:600,marginBottom:12}}>✏️ Gestión de suministro</div>
               <div style={{marginBottom:10}}>
                 <label style={{fontSize:12,color:'#6b6860',fontWeight:600}}>ESTADO</label>
-                <div style={{marginTop:6}}><EstadoSelector current={estado} onChange={setEstado}/></div>
+                <div style={{marginTop:6}}><EstadoSelector current={estado} onChange={v=>{setEstado(v);setError('');}}/></div>
               </div>
               <div style={{marginBottom:10}}>
-                <label style={{fontSize:12,color:'#6b6860',fontWeight:600}}>VALOR UNITARIO</label>
-                <input type="number" value={precio} onChange={e=>setPrecio(e.target.value)}
-                  style={{width:'100%',border:'1.5px solid #e2dfd8',borderRadius:8,padding:'7px 10px',fontSize:13,fontFamily:'inherit',outline:'none',marginTop:4,boxSizing:'border-box'}}/>
+                <label style={{fontSize:12,color:'#6b6860',fontWeight:600}}>
+                  VALOR UNITARIO
+                  {intentaEntregado && <span style={{color:'#dc2626',marginLeft:4,fontWeight:400}}>* requerido para Entregado</span>}
+                </label>
+                <input type="number" value={precio}
+                  onChange={e=>{setPrecio(e.target.value);if(Number(e.target.value)>0)setError('');}}
+                  placeholder="Ej: 80000"
+                  style={{width:'100%',borderRadius:8,padding:'7px 10px',fontSize:13,fontFamily:'inherit',outline:'none',marginTop:4,boxSizing:'border-box',
+                    border:bloqueado?'1.5px solid #dc2626':'1.5px solid #e2dfd8',
+                    background:bloqueado?'#fff1f1':'#fff'}}/>
               </div>
-              {error && <div style={{fontSize:12,color:'#dc2626',marginBottom:8}}>⚠ {error}</div>}
-              <button onClick={guardar} disabled={guardando}
-                style={{width:'100%',padding:'9px',background:'#1a1916',color:'#fff',border:'none',borderRadius:9,fontSize:13,fontWeight:600,fontFamily:'inherit',cursor:'pointer'}}>
-                {guardando?'Guardando…':'Guardar cambios'}
+              {bloqueado && (
+                <div style={{padding:'8px 12px',background:'#fff1f1',border:'1px solid #fecaca',borderRadius:8,fontSize:12.5,color:'#dc2626',marginBottom:10}}>
+                  ⚠️ Ingresa el valor unitario para poder marcar como <strong>Entregado</strong>
+                </div>
+              )}
+              {error && !bloqueado && <div style={{fontSize:12,color:'#dc2626',marginBottom:8}}>⚠ {error}</div>}
+              <button onClick={guardar} disabled={guardando||bloqueado}
+                style={{width:'100%',padding:'9px',border:'none',borderRadius:9,fontSize:13,fontWeight:600,fontFamily:'inherit',
+                  cursor:bloqueado?'not-allowed':'pointer',
+                  background:bloqueado?'#e2dfd8':'#1a1916',
+                  color:bloqueado?'#9c9a92':'#fff'}}>
+                {guardando?'Guardando…':bloqueado?'⚠ Ingresa el precio primero':'Guardar cambios'}
               </button>
             </div>
           )}
