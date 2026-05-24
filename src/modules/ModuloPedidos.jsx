@@ -66,6 +66,152 @@ function Badge({ cfg }) {
   );
 }
 
+// ── ESTADO SELECTOR ───────────────────────────────────────────
+function EstadoSelector({ current, onChange, disabled }) {
+  const [open, setOpen] = useState(false);
+  const cfg = ESTADOS[current] || ESTADOS.pendiente;
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const h = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, [open]);
+
+  return (
+    <div ref={ref} style={{position:'relative'}}>
+      <div onClick={e=>{if(disabled)return;e.stopPropagation();setOpen(!open);}}
+        style={{display:'inline-flex',alignItems:'center',gap:5,padding:'3px 9px',borderRadius:99,fontSize:11.5,fontWeight:600,background:cfg.bg,color:cfg.color,cursor:disabled?'default':'pointer',userSelect:'none'}}>
+        <span style={{width:5,height:5,borderRadius:'50%',background:cfg.dot}}/>
+        {cfg.label}
+        {!disabled && <span style={{fontSize:10,marginLeft:2}}>▾</span>}
+      </div>
+      {open && (
+        <div style={{position:'absolute',top:'calc(100% + 4px)',left:0,background:'#fff',border:'1px solid #e2dfd8',borderRadius:10,overflow:'hidden',zIndex:100,minWidth:160,boxShadow:'0 8px 24px rgba(0,0,0,.1)'}}>
+          {Object.entries(ESTADOS).map(([key,val])=>(
+            <div key={key} onClick={e=>{e.stopPropagation();onChange(key);setOpen(false);}}
+              style={{display:'flex',alignItems:'center',gap:8,padding:'9px 12px',cursor:'pointer',background:current===key?'#f0eee9':'#fff',fontSize:13,fontWeight:current===key?600:400}}
+              onMouseEnter={e=>e.currentTarget.style.background='#f7f6f3'}
+              onMouseLeave={e=>e.currentTarget.style.background=current===key?'#f0eee9':'#fff'}>
+              <span style={{width:7,height:7,borderRadius:'50%',background:val.dot,flexShrink:0}}/>
+              {val.label}
+              {current===key && <span style={{marginLeft:'auto',fontSize:12}}>✓</span>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── DETALLE PEDIDO ────────────────────────────────────────────
+function DetallePedido({ pedido, onClose, onUpdate, onCambiarEstado, puedeEditar }) {
+  const { perfil }                               = useAuth();
+  const { comentarios, agregarComentario }       = useComentariosPedido(pedido.id);
+  const [precio, setPrecio]                      = useState(pedido.unitario||0);
+  const [estado, setEstado]                      = useState(pedido.estado);
+  const [nuevoComent, setNuevo]                  = useState('');
+  const [guardando, setGuardando]                = useState(false);
+  const [error, setError]                        = useState('');
+
+  const guardar = async () => {
+    setGuardando(true); setError('');
+    try { await onUpdate(pedido.id,{unitario:Number(precio),estado}); }
+    catch(e) { setError(e.message); }
+    finally { setGuardando(false); }
+  };
+
+  const enviarComent = async () => {
+    if (!nuevoComent.trim()) return;
+    try { await agregarComentario(nuevoComent.trim(),perfil.id); setNuevo(''); }
+    catch(e) { setError(e.message); }
+  };
+
+  return (
+    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.4)',zIndex:200,display:'flex',alignItems:'flex-start',justifyContent:'flex-end'}} onClick={onClose}>
+      <div style={{background:'#fff',width:460,maxWidth:'95vw',height:'100vh',overflowY:'auto',boxShadow:'-8px 0 32px rgba(0,0,0,.12)'}} onClick={e=>e.stopPropagation()}>
+        <div style={{padding:'20px 24px',borderBottom:'1px solid #e2dfd8',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+          <div>
+            <div style={{fontSize:16,fontWeight:700}}>{fmtNumPedido(pedido.numero)} — {pedido.repuesto}</div>
+            <div style={{fontSize:12,color:'#9c9a92',marginTop:2}}>{pedido.marca} {pedido.modelo} · {tiempoRelativo(pedido.created_at)}</div>
+          </div>
+          <button onClick={onClose} style={{background:'none',border:'none',fontSize:20,cursor:'pointer',color:'#9c9a92'}}>×</button>
+        </div>
+        <div style={{padding:24,display:'flex',flexDirection:'column',gap:20}}>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+            {[
+              {label:'Técnico',    val: pedido.tecnico?.nombre||'—'},
+              {label:'Prioridad',  val: <Badge cfg={PRIORIDADES[pedido.prioridad]||PRIORIDADES.normal}/>},
+              {label:'Marca',      val: pedido.marca||'—'},
+              {label:'Modelo',     val: pedido.modelo||'—'},
+              {label:'Tipo',       val: pedido.tipo||'—'},
+              {label:'Cantidad',   val: pedido.cantidad},
+              {label:'Fecha/Hora', val: new Date(pedido.created_at).toLocaleString('es-CO',{dateStyle:'medium',timeStyle:'medium'})},
+              {label:'Estado',     val: <Badge cfg={ESTADOS[pedido.estado]||ESTADOS.pendiente}/>},
+            ].map(({label,val})=>(
+              <div key={label} style={{background:'#f7f6f3',borderRadius:9,padding:'10px 12px'}}>
+                <div style={{fontSize:11,color:'#9c9a92',fontWeight:600,marginBottom:3}}>{label}</div>
+                <div style={{fontSize:13,fontWeight:500}}>{val}</div>
+              </div>
+            ))}
+          </div>
+          {pedido.observaciones && (
+            <div style={{background:'#fef3c7',border:'1px solid #fde68a',borderRadius:9,padding:'10px 12px'}}>
+              <div style={{fontSize:11,color:'#d97706',fontWeight:600,marginBottom:3}}>OBSERVACIONES</div>
+              <div style={{fontSize:13}}>{pedido.observaciones}</div>
+            </div>
+          )}
+          {puedeEditar && (
+            <div style={{background:'#f7f6f3',borderRadius:10,padding:16}}>
+              <div style={{fontSize:13,fontWeight:600,marginBottom:12}}>✏️ Gestión de suministro</div>
+              <div style={{marginBottom:10}}>
+                <label style={{fontSize:12,color:'#6b6860',fontWeight:600}}>ESTADO</label>
+                <div style={{marginTop:6}}><EstadoSelector current={estado} onChange={setEstado}/></div>
+              </div>
+              <div style={{marginBottom:10}}>
+                <label style={{fontSize:12,color:'#6b6860',fontWeight:600}}>VALOR UNITARIO</label>
+                <input type="number" value={precio} onChange={e=>setPrecio(e.target.value)}
+                  style={{width:'100%',border:'1.5px solid #e2dfd8',borderRadius:8,padding:'7px 10px',fontSize:13,fontFamily:'inherit',outline:'none',marginTop:4,boxSizing:'border-box'}}/>
+              </div>
+              {error && <div style={{fontSize:12,color:'#dc2626',marginBottom:8}}>⚠ {error}</div>}
+              <button onClick={guardar} disabled={guardando}
+                style={{width:'100%',padding:'9px',background:'#1a1916',color:'#fff',border:'none',borderRadius:9,fontSize:13,fontWeight:600,fontFamily:'inherit',cursor:'pointer'}}>
+                {guardando?'Guardando…':'Guardar cambios'}
+              </button>
+            </div>
+          )}
+          <div>
+            <div style={{fontSize:13,fontWeight:600,marginBottom:10}}>💬 Comentarios ({comentarios.length})</div>
+            <div style={{display:'flex',flexDirection:'column',gap:8,maxHeight:200,overflowY:'auto',marginBottom:10}}>
+              {comentarios.length===0
+                ? <div style={{fontSize:13,color:'#9c9a92',textAlign:'center',padding:'16px 0'}}>Sin comentarios aún</div>
+                : comentarios.map(c=>(
+                  <div key={c.id} style={{background:'#f7f6f3',borderRadius:8,padding:'8px 12px'}}>
+                    <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}>
+                      <span style={{fontSize:12,fontWeight:600}}>{c.autor?.nombre||'—'}</span>
+                      <span style={{fontSize:11,color:'#9c9a92'}}>{tiempoRelativo(c.created_at)}</span>
+                    </div>
+                    <div style={{fontSize:13}}>{c.texto}</div>
+                  </div>
+                ))
+              }
+            </div>
+            <div style={{display:'flex',gap:8}}>
+              <input value={nuevoComent} onChange={e=>setNuevo(e.target.value)}
+                onKeyDown={e=>e.key==='Enter'&&enviarComent()}
+                placeholder="Escribe un comentario…"
+                style={{flex:1,border:'1.5px solid #e2dfd8',borderRadius:8,padding:'7px 10px',fontSize:13,fontFamily:'inherit',outline:'none'}}/>
+              <button onClick={enviarComent}
+                style={{padding:'7px 12px',background:'#1a1916',color:'#fff',border:'none',borderRadius:8,fontSize:13,cursor:'pointer',fontFamily:'inherit'}}>→</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── MÓDULO PRINCIPAL ──────────────────────────────────────────
 export default function ModuloPedidos() {
   const { esSuministro }                                          = useAuth();
