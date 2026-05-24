@@ -19,12 +19,6 @@ const PRIO_CFG = {
   alta:    { label:'Alta',    bg:'#fef3c7', color:'#d97706' },
   normal:  { label:'Normal',  bg:'#f4f3f0', color:'#9c9a92' },
 };
-  pendiente:   { label: 'Pendiente',   bg: '#fef3c7', color: '#d97706', dot: '#d97706' },
-  pedido:      { label: 'Pedido',      bg: '#dbeafe', color: '#2563eb', dot: '#2563eb' },
-  entregado:   { label: 'Entregado',   bg: '#dcfce7', color: '#15803d', dot: '#15803d' },
-  devuelto:    { label: 'Devuelto',    bg: '#fee2e2', color: '#dc2626', dot: '#dc2626' },
-  no_consigue: { label: 'No consigue', bg: '#f4f3f0', color: '#9c9a92', dot: '#9c9a92' },
-};
 
 
 function Badge({ cfg }) {
