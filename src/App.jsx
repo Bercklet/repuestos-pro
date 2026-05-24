@@ -10,16 +10,18 @@ import RepuestosPRO      from './modules/RepuestosPRO';
 import ModuloPedidos     from './modules/ModuloPedidos';
 import ModuloRepuestos   from './modules/ModuloRepuestos';
 import ModuloProveedores from './modules/ModuloProveedores';
+import ModuloCotizaciones from './modules/ModuloCotizaciones';
 import PanelAdmin        from './modules/PanelAdmin';
 
 const NAV = [
-  { id: 'dashboard',   label: 'Dashboard',   icon: '⊞',  group: 'Principal', roles: ['admin','suministro','tecnico'] },
-  { id: 'pedidos',     label: 'Pedidos',     icon: '🛒', group: 'Principal', roles: ['admin','suministro','tecnico'] },
-  { id: 'repuestos',   label: 'Repuestos',   icon: '🔧', group: 'Principal', roles: ['admin','suministro','tecnico'] },
-  { id: 'proveedores', label: 'Proveedores', icon: '🏪', group: 'Gestión',   roles: ['admin','suministro'] },
-  { id: 'reportes',    label: 'Reportes',    icon: '📊', group: 'Gestión',   roles: ['admin','suministro'] },
-  { id: 'auditoria',   label: 'Auditoría',   icon: '🕐', group: 'Sistema',   roles: ['admin','suministro'] },
-  { id: 'usuarios',    label: 'Usuarios',    icon: '👥', group: 'Sistema',   roles: ['admin'] },
+  { id: 'dashboard',    label: 'Dashboard',    icon: '⊞',  group: 'Principal', roles: ['admin','suministro','tecnico'] },
+  { id: 'pedidos',      label: 'Pedidos',      icon: '🛒', group: 'Principal', roles: ['admin','suministro','tecnico'] },
+  { id: 'repuestos',    label: 'Repuestos',    icon: '🔧', group: 'Principal', roles: ['admin','suministro','tecnico'] },
+  { id: 'proveedores',  label: 'Proveedores',  icon: '🏪', group: 'Gestión',   roles: ['admin','suministro'] },
+  { id: 'cotizaciones', label: 'Cotizaciones', icon: '🏷️', group: 'Gestión',   roles: ['admin','suministro'] },
+  { id: 'reportes',     label: 'Reportes',     icon: '📊', group: 'Gestión',   roles: ['admin','suministro'] },
+  { id: 'auditoria',    label: 'Auditoría',    icon: '🕐', group: 'Sistema',   roles: ['admin','suministro'] },
+  { id: 'usuarios',     label: 'Usuarios',     icon: '👥', group: 'Sistema',   roles: ['admin'] },
 ];
 
 // Tabs que aparecen en la barra inferior del móvil (los 4 más usados)
@@ -318,14 +320,15 @@ function BottomNav({ active, setActive, perfil }) {
 // ── ROUTING ───────────────────────────────────────────────────
 function getComponent(active) {
   switch (active) {
-    case 'dashboard':   return RepuestosPRO;
-    case 'pedidos':     return ModuloPedidos;
-    case 'repuestos':   return ModuloRepuestos;
-    case 'proveedores': return ModuloProveedores;
-    case 'reportes':    return (props) => <PanelAdmin {...props} tab="reportes" />;
-    case 'auditoria':   return (props) => <PanelAdmin {...props} tab="auditoria" />;
-    case 'usuarios':    return (props) => <PanelAdmin {...props} tab="usuarios" />;
-    default:            return RepuestosPRO;
+    case 'dashboard':    return RepuestosPRO;
+    case 'pedidos':      return ModuloPedidos;
+    case 'repuestos':    return ModuloRepuestos;
+    case 'proveedores':  return ModuloProveedores;
+    case 'cotizaciones': return ModuloCotizaciones;
+    case 'reportes':     return (props) => <PanelAdmin {...props} tab="reportes" />;
+    case 'auditoria':    return (props) => <PanelAdmin {...props} tab="auditoria" />;
+    case 'usuarios':     return (props) => <PanelAdmin {...props} tab="usuarios" />;
+    default:             return RepuestosPRO;
   }
 }
 
