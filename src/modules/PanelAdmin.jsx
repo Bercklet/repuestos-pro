@@ -158,9 +158,11 @@ function ModalEditarPerfil({ perfil, onClose, onGuardado }) {
     if (!nombre.trim()) { setError('El nombre no puede estar vacío'); return; }
     setGuardando(true); setError('');
     try {
+      const nombreFinal = nombre.trim();
+      const avatarNuevo = nombreFinal.split(' ').filter(Boolean).map(w => w[0]).join('').toUpperCase().slice(0, 2);
       const { error: err } = await supabase
         .from('perfiles')
-        .update({ nombre: nombre.trim() })
+        .update({ nombre: nombreFinal, avatar: avatarNuevo })
         .eq('id', perfil.id);
       if (err) throw err;
       onGuardado?.();
@@ -229,8 +231,9 @@ function SeccionUsuarios() {
   const handleEditarNombre = async (id, nombre) => {
     if (!nombre.trim()) return;
     try {
-      await actualizarUsuario(id, { nombre: nombre.trim() });
-      // Si es el propio usuario, recargar el perfil en el contexto
+      const nombreFinal = nombre.trim();
+      const avatarNuevo = nombreFinal.split(' ').filter(Boolean).map(w => w[0]).join('').toUpperCase().slice(0, 2);
+      await actualizarUsuario(id, { nombre: nombreFinal, avatar: avatarNuevo });
       if (id === miPerfil?.id) recargarPerfil?.();
     }
     catch (e) { setError(e.message); }
